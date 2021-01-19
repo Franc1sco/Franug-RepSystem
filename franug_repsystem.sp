@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -58,10 +58,17 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_rep", Command_Rep);
 }
 
+public void OnClientPostAdminCheck(int client)
+{
+	if (IsFakeClient(client))return;
+	
+	CheckSQLSteamID(client);
+}
+
 public void CheckSQLSteamID(int client)
 {
 	char query[255], steamid[32];
-	GetClientAuthId(client, AuthId_Steam2,steamid, sizeof(steamid) );
+	if(!GetClientAuthId(client, AuthId_Steam2,steamid, sizeof(steamid) ))return;
 	
 	Format(query, sizeof(query), "SELECT * FROM franug_reppoints WHERE steamid = '%s'", steamid);
 	SQL_TQuery(g_hDB, CheckSQLSteamIDCallback, query, GetClientUserId(client));
@@ -92,7 +99,9 @@ public int CheckSQLSteamIDCallback(Handle owner, Handle hndl, char [] error, any
 public void InsertSQLNewPlayer(int client)
 {
 	char query[255], steamid[32];
-	GetClientAuthId(client, AuthId_Steam2,steamid, sizeof(steamid));
+	
+	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid)))return;
+	
 	int userid = GetClientUserId(client);
 	
 	char Name[MAX_NAME_LENGTH+1];
@@ -107,6 +116,8 @@ public void InsertSQLNewPlayer(int client)
 	
 	Format(query, sizeof(query), "INSERT INTO franug_reppoints(playername, steamid, points) VALUES('%s', '%s','0');", SafeName, steamid);
 	SQL_TQuery(g_hDB, SQL_Callback, query, userid);
+	
+	//LogToFile("addons/sourcemod/queries.log", query);
 }
 
 public int SQL_OnSQLConnect(Handle owner, Handle hndl, char [] error, any data)
@@ -132,7 +143,7 @@ public int SQL_OnSQLConnect(Handle owner, Handle hndl, char [] error, any data)
 			
 			Format(g_sSQLBuffer, sizeof(g_sSQLBuffer), "CREATE TABLE IF NOT EXISTS `franug_reppoints` (`playername` varchar(128) NOT NULL, `steamid` varchar(32), `points` int(4))");
 			
-			SQL_TQuery(g_hDB, SQL_OnSQLConnectCallback, g_sSQLBuffer);
+			SQL_TQuery(g_hDB, SQL_OnSQLConnectCallbackNext, g_sSQLBuffer);
 		}
 		else
 		{
@@ -142,10 +153,28 @@ public int SQL_OnSQLConnect(Handle owner, Handle hndl, char [] error, any data)
 			
 			Format(g_sSQLBuffer, sizeof(g_sSQLBuffer), "CREATE TABLE IF NOT EXISTS franug_reppoints (playername varchar(128) NOT NULL, steamid varchar(32), points INTEGER)");
 			
-			SQL_TQuery(g_hDB, SQL_OnSQLConnectCallback, g_sSQLBuffer);
+			SQL_TQuery(g_hDB, SQL_OnSQLConnectCallbackNext, g_sSQLBuffer);
 		}
 		PruneDatabase(); // todo
+		
 	}
+}
+
+public int SQL_OnSQLConnectCallbackNext(Handle owner, Handle hndl, char [] error, any data)
+{
+	if(hndl == INVALID_HANDLE)
+	{
+		LogError("Query failure: %s", error);
+		return;
+	}
+	
+	for (int i = 1; i <= MaxClients; i++)
+		{
+			if(IsClientInGame(i))
+			{
+				OnClientPostAdminCheck(i);
+			}
+		}
 }
 
 public int SQL_OnSQLConnectCallback(Handle owner, Handle hndl, char [] error, any data)
@@ -170,7 +199,7 @@ public Action Command_Rep(int client, int args)
 	GetCmdArg(1, arg1, sizeof(arg1));
 	
 	/* Try and find a matching player */
-	int target = FindTarget(client, arg1);
+	int target = FindTarget(client, arg1, true, false);
 	if (target == -1)
 	{
 		/* FindTarget() automatically replies with the 
@@ -197,7 +226,7 @@ public Action Command_Up(int client, int args)
 	GetCmdArg(1, arg1, sizeof(arg1));
 	
 	/* Try and find a matching player */
-	int target = FindTarget(client, arg1);
+	int target = FindTarget(client, arg1, true, false);
 	if (target == -1)
 	{
 		/* FindTarget() automatically replies with the 
@@ -229,7 +258,7 @@ public Action Command_Down(int client, int args)
 	/* Get the first argument */
 	GetCmdArg(1, arg1, sizeof(arg1));
 	/* Try and find a matching player */
-	int target = FindTarget(client, arg1);
+	int target = FindTarget(client, arg1, true, false);
 	if (target == -1)
 	{
 		/* FindTarget() automatically replies with the 
@@ -252,7 +281,7 @@ public Action Command_Down(int client, int args)
 void CheckPoints(int client, int target)
 {
 	char steamid[32];
-	GetClientAuthId(target, AuthId_Steam2,steamid, sizeof(steamid));
+	if (!GetClientAuthId(target, AuthId_Steam2, steamid, sizeof(steamid)))return;
 	
 	char buffer[512];
 	Format(buffer, sizeof(buffer), "SELECT points FROM franug_reppoints WHERE steamid = '%s'", steamid);
@@ -302,10 +331,10 @@ public void SQL_GetPoints(Handle db, Handle results, char [] error, DataPack Pac
 void GivePoints(int client, int target, int isUp)
 {
 	char steamid[32];
-	GetClientAuthId(client, AuthId_Steam2,steamid, sizeof(steamid));
+	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid)))return;
 	
 	char buffer[512];
-	Format(buffer, sizeof(buffer), "SELECT COUNT(*) FROM franug_reptimes WHERE (time+%i) < %i AND WHERE steamid = '%s'", TIME_REQUIRED, GetTime(), steamid);
+	Format(buffer, sizeof(buffer), "SELECT COUNT(*) FROM franug_reptimes WHERE (time+%i) < %i AND steamid = '%s'", TIME_REQUIRED, GetTime(), steamid);
 	
 	DataPack Pack = new DataPack();
 	Pack.WriteCell(GetClientUserId(client));
@@ -389,10 +418,10 @@ void doVote(int client, int target, int isUp)
 		SQL_EscapeString(g_hDB, NameVoted, SafeNameVoted, sizeof(SafeNameVoted));
 	}
 	char steamid[32];
-	GetClientAuthId(client, AuthId_Steam2,steamid, sizeof(steamid));
+	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid)))return;
 	
 	char steamidvoted[32];
-	GetClientAuthId(target, AuthId_Steam2,steamidvoted, sizeof(steamidvoted));
+	if (!GetClientAuthId(target, AuthId_Steam2,steamidvoted, sizeof(steamidvoted)))return;
 	
 	Format(query, sizeof(query), "INSERT INTO franug_reptimes(playername, steamid, time) VALUES('%s', '%s', '%d');", SafeName, steamid, GetTime());
 	SQL_TQuery(g_hDB, SQL_Callback, query);
