@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.4"
+#define VERSION "0.4.1"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -334,7 +334,7 @@ void GivePoints(int client, int target, int isUp)
 	if (!GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid)))return;
 	
 	char buffer[512];
-	Format(buffer, sizeof(buffer), "SELECT COUNT(*) FROM franug_reptimes WHERE (time+%i) < %i AND steamid = '%s'", TIME_REQUIRED, GetTime(), steamid);
+	Format(buffer, sizeof(buffer), "SELECT COUNT(*) FROM franug_reptimes WHERE time > (%i-%i) AND steamid = '%s'", GetTime(),TIME_REQUIRED, steamid);
 	
 	DataPack Pack = new DataPack();
 	Pack.WriteCell(GetClientUserId(client));
