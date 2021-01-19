@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.2.1"
+#define VERSION "0.3"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -206,6 +206,12 @@ public Action Command_Up(int client, int args)
 		return Plugin_Handled;
 	}
 	
+	if(target == client)
+	{
+		ReplyToCommand(client, "Cant vote yourself");
+		return Plugin_Handled;
+	}
+	
 	GivePoints(client, target, 1);
 	
 	return Plugin_Handled;
@@ -229,6 +235,12 @@ public Action Command_Down(int client, int args)
 		/* FindTarget() automatically replies with the 
 		 * failure reason.
 		 */
+		return Plugin_Handled;
+	}
+	
+	if(target == client)
+	{
+		ReplyToCommand(client, "Cant vote yourself");
 		return Plugin_Handled;
 	}
 	
