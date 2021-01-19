@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -55,6 +55,7 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_up", Command_Up);
 	RegConsoleCmd("sm_down", Command_Down);
 	RegConsoleCmd("sm_reptop", Command_Top);
+	RegConsoleCmd("sm_rep", Command_Rep);
 }
 
 public void CheckSQLSteamID(int client)
@@ -156,6 +157,33 @@ public int SQL_OnSQLConnectCallback(Handle owner, Handle hndl, char [] error, an
 	}
 }
 
+public Action Command_Rep(int client, int args)
+{
+	
+	if(args < 1) // Not enough parameters
+	{
+		ReplyToCommand(client, "[SM] Use: sm_rep <#userid|name>");
+		return Plugin_Handled;
+	}
+	char arg1[64];
+	/* Get the first argument */
+	GetCmdArg(1, arg1, sizeof(arg1));
+	
+	/* Try and find a matching player */
+	int target = FindTarget(client, arg1);
+	if (target == -1)
+	{
+		/* FindTarget() automatically replies with the 
+		 * failure reason.
+		 */
+		return Plugin_Handled;
+	}
+	
+	CheckPoints(client, target);
+	
+	return Plugin_Handled;
+}
+
 public Action Command_Up(int client, int args)
 {
 	
@@ -207,6 +235,57 @@ public Action Command_Down(int client, int args)
 	GivePoints(client, target, 0);
 	
 	return Plugin_Handled;
+}
+
+void CheckPoints(int client, int target)
+{
+	char steamid[32];
+	GetClientAuthId(target, AuthId_Steam2,steamid, sizeof(steamid));
+	
+	char buffer[512];
+	Format(buffer, sizeof(buffer), "SELECT points FROM franug_reppoints WHERE steamid = '%s'", steamid);
+	
+	DataPack Pack = new DataPack();
+	Pack.WriteCell(GetClientUserId(client));
+	Pack.WriteCell(GetClientUserId(target));
+	
+	SQL_TQuery(g_hDB, SQL_GetPoints, buffer, Pack);
+}
+
+public void SQL_GetPoints(Handle db, Handle results, char [] error, DataPack Pack)
+{
+	Pack.Reset();
+	int client = ReadPackCell(Pack);
+	int target = ReadPackCell(Pack);
+    
+	if((client = GetClientOfUserId(client)) == 0)
+	{
+		return;
+	}
+	
+	if((target = GetClientOfUserId(target)) == 0)
+	{
+		PrintToChat(client, "Target client disconnected");
+		return;
+	}
+	
+	if (results == INVALID_HANDLE)
+	{
+		LogError("Failed to query (error: %s)", error);
+		PrintToChat(client, "An unexpected error has occurred");
+		return;
+	}
+    
+	if(!SQL_GetRowCount(results) || !SQL_FetchRow(results)) 
+	{
+		PrintToChat(client, " An unexpected error has occurred with db results");
+		return;
+	}
+	
+	int points = SQL_FetchInt(results, 0);
+	
+	PrintToChat(client, "%N have %i points", target, points);
+	
 }
 
 void GivePoints(int client, int target, int isUp)

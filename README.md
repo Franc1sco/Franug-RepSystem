@@ -11,7 +11,8 @@ sm_repsystem_vipflag "o" // Flag required for be Vip
 
 Commands:
 ```
-!up <playername> // give +1 to a player
-!down <playername> // give -1 to a player
+!up <#userid|playername> // give +1 to a player
+!down <#userid|playername> // give -1 to a player
 !reptop // See the top
+!rep <#userid|playername> // See the current points from a player
 ```
