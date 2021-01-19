@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.2"
+#define VERSION "0.2.1"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -275,14 +275,13 @@ public void SQL_GetPoints(Handle db, Handle results, char [] error, DataPack Pac
 		PrintToChat(client, "An unexpected error has occurred");
 		return;
 	}
-    
+	int points;
 	if(!SQL_GetRowCount(results) || !SQL_FetchRow(results)) 
 	{
-		PrintToChat(client, " An unexpected error has occurred with db results");
-		return;
+		points = 0;
 	}
-	
-	int points = SQL_FetchInt(results, 0);
+	else
+		points = SQL_FetchInt(results, 0);
 	
 	PrintToChat(client, "%N have %i points", target, points);
 	
@@ -328,14 +327,14 @@ public void SQL_GetVoteCount(Handle db, Handle results, char [] error, DataPack 
 		PrintToChat(client, "An unexpected error has occurred");
 		return;
 	}
+	int times;
     
 	if(!SQL_GetRowCount(results) || !SQL_FetchRow(results)) 
 	{
-		PrintToChat(client, " An unexpected error has occurred with db results");
-		return;
+		times = 0;
 	}
-	
-	int times = SQL_FetchInt(results, 0);
+	else
+		times = SQL_FetchInt(results, 0);
 	
 	int maxtimes;
 	
