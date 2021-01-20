@@ -20,7 +20,7 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define VERSION "0.4.1"
+#define VERSION "0.5"
 
 #define TIME_REQUIRED 86400 // 24 Hours
 
@@ -31,7 +31,7 @@
 Handle g_hDB = INVALID_HANDLE;
 bool g_bIsMySQl;
 
-ConVar cv_viptimes, cv_times, cv_vipflag;
+ConVar cv_viptimes, cv_times, cv_vipflag, cv_adminflag,cv_admintimes;
 
 public Plugin myinfo = 
 {
@@ -46,9 +46,11 @@ public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 	
-	cv_times = CreateConVar("sm_repsystem_times", "3", "Times that a regular player can vote during 24 H");
-	cv_viptimes = CreateConVar("sm_repsystem_viptimes", "5", "Times that a vip player can vote during 24 H");
+	cv_times = CreateConVar("sm_repsystem_times", "3", "Times that a regular player can vote during 24 H. 0 = unlimited.");
+	cv_viptimes = CreateConVar("sm_repsystem_viptimes", "5", "Times that a vip player can vote during 24 H. 0 = unlimited.");
+	cv_admintimes = CreateConVar("sm_repsystem_admintimes", "5", "Times that a admin player can vote during 24 H. 0 = unlimited.");
 	cv_vipflag = CreateConVar("sm_repsystem_vipflag", "o", "Flag required for be Vip");
+	cv_adminflag = CreateConVar("sm_repsystem_adminflag", "b", "Flag required for be Admin");
 	
 	SQL_TConnect(SQL_OnSQLConnect, "franug_repsystem");
 	
@@ -379,12 +381,14 @@ public void SQL_GetVoteCount(Handle db, Handle results, char [] error, DataPack 
 	
 	int maxtimes;
 	
-	if(isVip(client))
+	if(isAdmin(client))
+		maxtimes = cv_admintimes.IntValue;
+	else if(isVip(client))
 		maxtimes = cv_viptimes.IntValue;
 	else
 		maxtimes = cv_times.IntValue;
 	
-	if(times >= maxtimes)
+	if(times >= maxtimes && maxtimes != 0)
 	{
 		PrintToChat(client, "You exceeded the max votes per 24 H");
 		return;
@@ -559,12 +563,23 @@ bool GetCommunityID(char [] AuthID, char [] FriendID, int size)
 	return true;
 }
 
+bool isAdmin(int client)
+{
+	char flag[12];
+	GetConVarString(cv_adminflag, flag, 12);
+	
+	if(HasPermission(client, "z") || HasPermission(client, flag))
+		return true;
+		
+	return false;
+}
+
 bool isVip(int client)
 {
 	char flag[12];
 	GetConVarString(cv_vipflag, flag, 12);
 	
-	if(HasPermission(client, "z") || HasPermission(client, flag))
+	if(HasPermission(client, flag))
 		return true;
 		
 	return false;
